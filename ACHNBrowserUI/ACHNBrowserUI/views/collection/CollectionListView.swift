@@ -17,6 +17,7 @@ enum Tabs: String, CaseIterable {
 struct CollectionListView: View {
     @EnvironmentObject private var collection: UserCollection
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
+    @ObservedObject private var villagersViewModel = VillagersViewModel()
     @State private var selectedTab: Tabs = .items
     @State private var sheet: Sheet.SheetType?
         
@@ -24,31 +25,54 @@ struct CollectionListView: View {
         Array(Set(collection.items.map({ $0.category })))
     }
     
+    private var villagerStatusSections: [VillagerStatus] {
+        Array(Set(collection.villagersStatus.values.map{ $0 }))
+    }
+    
+    private func villagersFor(status: VillagerStatus) -> [Int] {
+        collection.villagersStatus.filter{ $0.value == status}.keys.map{ $0 }
+    }
+    
+    private func villagerFor(id: Int) -> Villager {
+        villagersViewModel.villagers.first(where: { $0.id == id})!
+    }
+    
     var body: some View {
         NavigationView {
             List {
-                Section(header: picker) {
-                    if selectedTab == .items && !collection.items.isEmpty {
-                        ForEach(categories, id: \.self) { category in
-                            CollectionRowView(category: Category(itemCategory: category))
-                        }
-                    } else if selectedTab == .villagers && !collection.villagers.isEmpty {
-                        ForEach(collection.villagers) { villager in
-                            NavigationLink(destination: VillagerDetailView(villager: villager)) {
-                                VillagerRowView(villager: villager)
-                            }
-                        }
-                    } else if selectedTab == .critters && !collection.critters.isEmpty {
-                        ForEach(collection.critters) { critter in
-                            NavigationLink(destination: ItemDetailView(item: critter)) {
-                                ItemRowView(displayMode: .large, item: critter)
-                            }
-                        }
-                    } else if selectedTab == .lists {
-                        userListsSections
-                    }  else {
-                        emptyView
+                Section {
+                    picker
+                }
+                if selectedTab == .items && !collection.items.isEmpty {
+                    ForEach(categories, id: \.self) { category in
+                        CollectionRowView(category: Category(itemCategory: category))
                     }
+                } else if selectedTab == .villagers && !collection.villagers.isEmpty {
+                    ForEach(collection.villagers.filter{ !collection.villagersStatus.keys.map{ $0 }.contains($0.id)} )
+                    { villager in
+                        NavigationLink(destination: VillagerDetailView(villager: villager)) {
+                            VillagerRowView(villager: villager)
+                        }
+                    }
+                    ForEach(villagerStatusSections, id: \.self) { status in
+                        Section(header: Text(status.sectionLabelValue())) {
+                            ForEach(self.villagersFor(status: status), id: \.self) { id in
+                                NavigationLink(destination: VillagerDetailView(villager: self.villagerFor(id: id))) {
+                                    VillagerRowView(villager: self.villagerFor(id: id))
+                                }
+                            }
+                        }
+                    }
+                } else if selectedTab == .critters && !collection.critters.isEmpty {
+                    ForEach(collection.critters) { critter in
+                        NavigationLink(destination: ItemDetailView(item: critter)) {
+                            ItemRowView(displayMode: .large, item: critter)
+                        }
+                    }
+                } else if selectedTab == .lists {
+                    userListsSections
+                }  else {
+                    emptyView
                 }
             }
             .listStyle(GroupedListStyle())

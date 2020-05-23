@@ -18,6 +18,7 @@ public class UserCollection: ObservableObject {
     @Published public var villagers: [Villager] = []
     @Published public var critters: [Item] = []
     @Published public var lists: [UserList] = []
+    @Published public var villagersStatus: [Int: VillagerStatus] = [:]
     @Published public var dailyTasks = DailyTasks()
     @Published public var isCloudEnabled = true
     @Published public var isSynched = false
@@ -26,6 +27,7 @@ public class UserCollection: ObservableObject {
     private struct SavedData: Codable {
         let items: [Item]
         let villagers: [Villager]
+        let villagersStatus: [Int: VillagerStatus]?
         let critters: [Item]
         let lists: [UserList]?
         let dailyTasks: DailyTasks?
@@ -90,6 +92,11 @@ public class UserCollection: ObservableObject {
         }
         save()
         return added
+    }
+    
+    public func setVillagerStatus(villager: Int, status: VillagerStatus?) {
+        villagersStatus[villager] = status
+        save()
     }
     
     public func
@@ -219,7 +226,12 @@ public class UserCollection: ObservableObject {
     // MARK: - Import / Export
     private func save() {
         do {
-            let savedData = SavedData(items: items, villagers: villagers, critters: critters, lists: lists, dailyTasks: dailyTasks)
+            let savedData = SavedData(items: items,
+                                      villagers: villagers,
+                                      villagersStatus: villagersStatus,
+                                      critters: critters,
+                                      lists: lists,
+                                      dailyTasks: dailyTasks)
             let data = try encoder.encode(savedData)
             try data.write(to: filePath, options: .atomicWrite)
         
@@ -243,6 +255,7 @@ public class UserCollection: ObservableObject {
                 self.critters = savedData.critters
                 self.lists = savedData.lists ?? []
                 self.dailyTasks = savedData.dailyTasks ?? DailyTasks()
+                self.villagersStatus = savedData.villagersStatus ?? [:]
                 return true
             } catch {
                 return false

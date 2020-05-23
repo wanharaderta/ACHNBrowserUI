@@ -13,6 +13,7 @@ import UI
 struct VillagerDetailView: View {
     @ObservedObject var viewModel: VillagerDetailViewModel
     @EnvironmentObject private var collection: UserCollection
+    
     @State private var backgroundColor = Color.acSecondaryBackground
     @State private var textColor = Color.acText
     @State private var secondaryTextColor = Color.acSecondaryText
@@ -52,6 +53,14 @@ struct VillagerDetailView: View {
         }
     }
     
+    private var statusView: some View {
+        Picker(selection: $viewModel.villagerStatus, label: Text("")) {
+            ForEach(VillagerStatus.allCases, id: \.self) { status in
+                Text(status.labelValue())
+            }
+        }.pickerStyle(SegmentedPickerStyle())
+    }
+    
     private func makeInfoCell(title: LocalizedStringKey, value: String) -> some View {
         HStack {
             Text(title)
@@ -76,6 +85,7 @@ struct VillagerDetailView: View {
             }
             .listRowBackground(Rectangle().fill(backgroundColor))
             .padding()
+            statusView.listRowBackground(Rectangle().fill(backgroundColor))
             makeInfoCell(title: "Personality", value: villager.personality).padding()
             makeInfoCell(title: "Birthday", value: villager.formattedBirthday ?? "Unknown").padding()
             makeInfoCell(title: "Like", value: viewModel.likes?.map{ $0.capitalized }.joined(separator: ", ") ?? "Unknown").padding()
@@ -131,8 +141,7 @@ struct VillagerDetailView: View {
         .environment(\.horizontalSizeClass, .regular)
         .navigationBarTitle(Text(villager.localizedName), displayMode: .automatic)
         .onAppear {
-            self.viewModel.fetchItems()
-            
+            self.viewModel.fetchItems()            
             let url = ACNHApiService.BASE_URL.absoluteString +
                 ACNHApiService.Endpoint.villagerIcon(id: self.villager.id).path()
             ImageService.getImageColors(key: url) { colors in

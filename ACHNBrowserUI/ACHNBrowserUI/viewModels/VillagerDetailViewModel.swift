@@ -15,9 +15,17 @@ public class VillagerDetailViewModel: ObservableObject {
     @Published var villagerItems: [Item]?
     @Published var preferredItems: [Item]?
     @Published var likes: [String]?
+    @Published var villagerStatus: VillagerStatus {
+        didSet {
+            UserCollection.shared.setVillagerStatus(villager: villager.id,
+                                                    status: villagerStatus)
+        }
+    }
+    
     
     init(villager: Villager) {
         self.villager = villager
+        self.villagerStatus = UserCollection.shared.villagersStatus[villager.id] ?? .unknown
     }
     
     func fetchItems() {
