@@ -549,4 +549,5 @@ You can cancel anytime with your iTunes account settings. Any unused portion of 
 // Musics
 "Music player" = "Lecteur de musique";
 "Tracks" = "Musiques";
+"%lldh when %@" = "%lldh when %@";
 

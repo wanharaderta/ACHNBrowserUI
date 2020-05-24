@@ -31,11 +31,17 @@ public class MusicPlayerManager: ObservableObject {
         }
     }
     
-    @Published public var songs: [String: Song] = [:]
+    @Published public var kkTracks: [String: Song] = [:]
+    @Published public var hourlyMusics: [String: HourlyMusic] = [:]
+    public var sortedHourlyMusics: [HourlyMusic] {
+        hourlyMusics.values.map{ $0 }.sorted(by: \.id).reversed()
+    }
+    
     @Published public var currentSongItem: Item?
     @Published public var currentSong: Song? {
         didSet {
             if let song = currentSong {
+                currentHourlyMusic = nil
                 currentSongItem = matchItemFrom(song: song)
                 let musicURL = ACNHApiService.makeURL(endpoint: .music(id: song.id))
                 player?.pause()
@@ -45,6 +51,20 @@ public class MusicPlayerManager: ObservableObject {
             }
         }
     }
+    
+    @Published public var currentHourlyMusic: HourlyMusic? {
+        didSet {
+            if let music = currentHourlyMusic {
+                currentSong = nil
+                currentSongItem = nil
+                
+                let musicURL = ACNHApiService.makeURL(endpoint: .hourly(id: music.id))
+                player?.pause()
+                player = AVPlayer(url: musicURL)
+            }
+        }
+    }
+    
     @Published public var isPlaying = false {
         didSet {
             isPlaying ? player?.play() : player?.pause()
@@ -55,6 +75,7 @@ public class MusicPlayerManager: ObservableObject {
     @Published public var playmode = PlayMode.stopEnd
     
     private var songsCancellable: AnyCancellable?
+    private var hourlyMusicCancellable: AnyCancellable?
     private var player: AVPlayer?
     
     init() {
@@ -64,7 +85,15 @@ public class MusicPlayerManager: ObservableObject {
             .eraseToAnyPublisher()
             .subscribe(on: DispatchQueue.global())
             .receive(on: DispatchQueue.main)
-            .sink(receiveValue: { [weak self] songs in self?.songs = songs })
+            .sink(receiveValue: { [weak self] songs in self?.kkTracks = songs })
+        
+        hourlyMusicCancellable = ACNHApiService
+            .fetch(endpoint: .backgroundmusic)
+            .replaceError(with: [:])
+            .eraseToAnyPublisher()
+            .subscribe(on: DispatchQueue.global())
+            .receive(on: DispatchQueue.main)
+            .sink(receiveValue: { [weak self] musics in self?.hourlyMusics = musics })
         
         NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
                                                object: player?.currentItem,
@@ -75,7 +104,7 @@ public class MusicPlayerManager: ObservableObject {
                                                     self?.isPlaying = false
                                                 case .random:
                                                     self?.isPlaying = false
-                                                    self?.currentSong = self?.songs.randomElement()?.value
+                                                    self?.currentSong = self?.kkTracks.randomElement()?.value
                                                     self?.isPlaying = true
                                                 case .ordered:
                                                     self?.isPlaying = false
@@ -94,22 +123,28 @@ public class MusicPlayerManager: ObservableObject {
     }
     
     private func changeSong(newIndex: Int) {
-        guard let current = currentSongItem,
-            var index = Items.shared.categories[.music]?.firstIndex(of: current) else {
-                return
-        }
-        index += newIndex
-        if index > 0 && index < Items.shared.categories[.music]?.count ?? 0 {
-            if let newSong = Items.shared.categories[.music]?[index],
-                let song = matchSongFrom(item: newSong) {
-                currentSong = song
+        if let current = currentSongItem,
+            var index = Items.shared.categories[.music]?.firstIndex(of: current) {
+            index += newIndex
+            if index > 0 && index < Items.shared.categories[.music]?.count ?? 0 {
+                if let newSong = Items.shared.categories[.music]?[index],
+                    let song = matchSongFrom(item: newSong) {
+                    currentSong = song
+                    isPlaying = true
+                }
+            }
+        } else if let current = currentHourlyMusic,
+            var index = sortedHourlyMusics.firstIndex(where: { $0.id == current.id }) {
+            index += newIndex
+            if index > 0 && index < hourlyMusics.count {
+                currentHourlyMusic = sortedHourlyMusics[index]
                 isPlaying = true
             }
         }
     }
     
     public func matchSongFrom(item: Item) -> Song? {
-        songs[item.filename ?? ""]
+        kkTracks[item.filename ?? ""]
     }
     
     public func matchItemFrom(song: Song) -> Item? {
@@ -145,8 +180,7 @@ public class MusicPlayerManager: ObservableObject {
     }
     
     private func setupBackgroundPlay() {
-        if let item = currentSongItem,
-            let filename = item.finalImage {
+        if let filename = currentSongItem?.finalImage {
             SDWebImageDownloader.shared.downloadImage(with: ImageService.computeUrl(key: filename)) { (image, _, _, _) in
                 if let image = image {
                     try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, policy: .longFormAudio, options: [])

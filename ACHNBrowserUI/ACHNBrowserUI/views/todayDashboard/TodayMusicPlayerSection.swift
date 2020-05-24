@@ -17,21 +17,34 @@ struct TodayMusicPlayerSection: View {
     
     @State private var presentedSheet: Sheet.SheetType?
     @State private var isNavigationActive = false
+    @State private var trackMode = TrackMode.tracks
+    
+    enum TrackMode: String, CaseIterable {
+        case tracks = "K.K Slider"
+        case hourly = "Hourly music"
+    }
     
     var body: some View {
         Section(header: SectionHeaderView(text: "Music player",
                                           icon: "music.note"))
         {
-            if musicPlayerManager.currentSongItem != nil {
+            if musicPlayerManager.currentSongItem != nil || musicPlayerManager.currentHourlyMusic != nil {
                 NavigationLink(destination: songsList, isActive: $isNavigationActive) {
-                    ItemRowView(displayMode: .largeNoButton, item: musicPlayerManager.currentSongItem!)
+                    if trackMode == .tracks && musicPlayerManager.currentSongItem != nil {
+                        ItemRowView(displayMode: .largeNoButton, item: musicPlayerManager.currentSongItem!)
+                    } else if trackMode == .hourly && musicPlayerManager.currentHourlyMusic != nil {
+                        Text(musicPlayerManager.currentHourlyMusic!.localizedName)
+                            .style(appStyle: .rowTitle)
+                    } else {
+                        RowLoadingView(isLoading: .constant(true))
+                    }
                 }
                 playerView
             } else {
                 RowLoadingView(isLoading: .constant(true))
             }
         }.onAppear {
-            if self.musicPlayerManager.currentSong == nil,
+            if self.musicPlayerManager.currentSong == nil && self.musicPlayerManager.currentHourlyMusic == nil,
                 let random = self.items.categories[.music]?.randomElement(),
                 let song = self.musicPlayerManager.matchSongFrom(item: random) {
                 self.musicPlayerManager.currentSong = song
@@ -79,17 +92,37 @@ struct TodayMusicPlayerSection: View {
         }
     }
     
+    private var picker: some View {
+        Picker("", selection: $trackMode) {
+            ForEach(TrackMode.allCases, id: \.self) { mode in
+                Text(mode.rawValue.capitalized)
+            }
+        }.pickerStyle(SegmentedPickerStyle())
+        
+    }
+    
     private var songsList: some View {
         List {
-            Section {
-                ForEach(items.categories[.music] ?? []) { item in
-                    ItemRowView(displayMode: .largeNoButton, item: item)
-                        .onTapGesture {
-                            if let song = self.musicPlayerManager.matchSongFrom(item: item) {
-                                self.musicPlayerManager.currentSong = song
+            Section(header: picker) {
+                if trackMode == .tracks {
+                    ForEach(items.categories[.music] ?? []) { item in
+                        ItemRowView(displayMode: .largeNoButton, item: item)
+                            .onTapGesture {
+                                if let song = self.musicPlayerManager.matchSongFrom(item: item) {
+                                    self.musicPlayerManager.currentSong = song
+                                    self.musicPlayerManager.isPlaying = true
+                                    self.isNavigationActive = false
+                                }
+                        }
+                    }
+                } else if trackMode == .hourly {
+                    ForEach(musicPlayerManager.sortedHourlyMusics) { music in
+                        Text(music.localizedName).style(appStyle: .rowTitle)
+                            .onTapGesture {
+                                self.musicPlayerManager.currentHourlyMusic = music
                                 self.musicPlayerManager.isPlaying = true
                                 self.isNavigationActive = false
-                            }
+                        }
                     }
                 }
             }

@@ -18,7 +18,9 @@ public struct ACNHApiService {
         case villagerIcon(id: Int)
         case villagerImage(id: Int)
         case songs
+        case backgroundmusic
         case music(id: Int)
+        case hourly(id: Int)
         
         public func path() -> String {
             switch self {
@@ -32,6 +34,10 @@ public struct ACNHApiService {
                 return "songs"
             case let .music(id):
                 return "music/\(id)"
+            case .backgroundmusic:
+                return "backgroundmusic"
+            case let .hourly(id):
+                return "hourly/\(id)"
             }
         }
     }
